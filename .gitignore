@@ -1,0 +1,9 @@
+# VS Code settings
+.vscode
+
+# Node
+node_modules
+
+# Compiled TS and source map
+dist
+
