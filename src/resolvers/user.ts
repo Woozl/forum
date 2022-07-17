@@ -67,7 +67,7 @@ export class UserResolver {
       return {
         errors: [
           {
-            field: 'username',
+            field: 'password',
             message: 'Password must be 3 characters or greater.'
           }
         ]
