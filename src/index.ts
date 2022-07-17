@@ -22,6 +22,9 @@ const main = async () => {
   let redisClient = createClient({ legacyMode: true });
   redisClient.connect().catch(console.error);
 
+  // https://github.com/apollographql/apollo-server/issues/5775#issuecomment-936896592
+  // Workaround to set cookie over insecure connection
+  // Set 'x-forwarded-proto' header to 'https' in ApolloGraphQL
   app.set('trust proxy', !__prod__);
 
   app.use(
@@ -38,7 +41,7 @@ const main = async () => {
         // secure: __prod__ // https only
 
         // to get it to work with Apollo GraphQL Studio
-        sameSite: 'none',
+        sameSite: __prod__ ? 'lax' : 'none',
         secure: true
       }
     })
