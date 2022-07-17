@@ -10,6 +10,10 @@ import { UserResolver } from './resolvers/user';
 import connectRedis from 'connect-redis';
 import session from 'express-session';
 import { MyContext } from './types';
+import {
+  ApolloServerPluginLandingPageProductionDefault,
+  ApolloServerPluginLandingPageLocalDefault
+} from 'apollo-server-core';
 const { createClient } = require('redis');
 
 const main = async () => {
@@ -41,8 +45,8 @@ const main = async () => {
         // secure: __prod__ // https only
 
         // to get it to work with Apollo GraphQL Studio
-        sameSite: __prod__ ? 'lax' : 'none',
-        secure: true
+        sameSite: __prod__ ? 'strict' : 'lax',
+        secure: __prod__
       }
     })
   );
@@ -52,7 +56,19 @@ const main = async () => {
       resolvers: [HelloResolver, PostResolver, UserResolver],
       validate: false
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res })
+    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
+    plugins: [
+      // Install a landing page plugin based on NODE_ENV
+      process.env.NODE_ENV === 'production'
+        ? ApolloServerPluginLandingPageProductionDefault({
+            graphRef: 'my-graph-id@my-graph-variant',
+            footer: false
+          })
+        : ApolloServerPluginLandingPageLocalDefault({
+            embed: true,
+            footer: false
+          })
+    ]
   });
 
   await apolloServer.start();
