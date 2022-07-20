@@ -14,7 +14,7 @@ import {
   ApolloServerPluginLandingPageProductionDefault,
   ApolloServerPluginLandingPageLocalDefault
 } from 'apollo-server-core';
-const { createClient } = require('redis');
+import Redis from 'ioredis';
 
 const main = async () => {
   const orm = await MikroORM.init(mikroOrmConfig);
@@ -23,8 +23,7 @@ const main = async () => {
   const app = express();
 
   const RedisStore = connectRedis(session);
-  let redisClient = createClient({ legacyMode: true });
-  redisClient.connect().catch(console.error);
+  let redis = new Redis();
 
   // https://github.com/apollographql/apollo-server/issues/5775#issuecomment-936896592
   // Workaround to set cookie over insecure connection
@@ -33,7 +32,7 @@ const main = async () => {
 
   app.use(
     session({
-      store: new RedisStore({ client: redisClient, disableTouch: true }),
+      store: new RedisStore({ client: redis, disableTouch: true }),
       name: COOKIE_ID,
       secret: 'be3708ed-a7d3-41d5-b7be-5b5afbff99da',
       saveUninitialized: false,
@@ -56,7 +55,7 @@ const main = async () => {
       resolvers: [HelloResolver, PostResolver, UserResolver],
       validate: false
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
+    context: ({ req, res }): MyContext => ({ em: orm.em, req, res, redis }),
     plugins: [
       // Install a landing page plugin based on NODE_ENV
       process.env.NODE_ENV === 'production'
