@@ -1,6 +1,5 @@
-import { MikroORM } from '@mikro-orm/core';
+import 'reflect-metadata';
 import { COOKIE_ID, __prod__ } from './constants';
-import mikroOrmConfig from './mikro-orm.config';
 import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
@@ -15,10 +14,20 @@ import {
   ApolloServerPluginLandingPageLocalDefault
 } from 'apollo-server-core';
 import Redis from 'ioredis';
+import { createConnection } from 'typeorm';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
 
 const main = async () => {
-  const orm = await MikroORM.init(mikroOrmConfig);
-  await orm.getMigrator().up();
+  const conn = createConnection({
+    type: 'postgres',
+    database: 'forum2',
+    username: 'postgres',
+    password: 'postgres',
+    logging: true,
+    synchronize: true,
+    entities: [Post, User]
+  });
 
   const app = express();
 
@@ -55,7 +64,7 @@ const main = async () => {
       resolvers: [HelloResolver, PostResolver, UserResolver],
       validate: false
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res, redis }),
+    context: ({ req, res }): MyContext => ({ req, res, redis }),
     plugins: [
       // Install a landing page plugin based on NODE_ENV
       process.env.NODE_ENV === 'production'
