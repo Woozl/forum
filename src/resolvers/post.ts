@@ -3,17 +3,20 @@ import {
   Arg,
   Ctx,
   Field,
+  FieldResolver,
   InputType,
   Int,
   Mutation,
   Query,
   Resolver,
+  Root,
   UseMiddleware
 } from 'type-graphql';
 import { MyContext } from 'src/types';
 import { isAuth } from '../middleware/isAuth';
 import { getConnection } from 'typeorm';
 import { POST_LIMIT_CAP } from '../constants';
+import { truncate } from '../utils/truncate';
 
 @InputType()
 class PostInput {
@@ -24,8 +27,16 @@ class PostInput {
   title!: string;
 }
 
-@Resolver()
+@Resolver(Post)
 export class PostResolver {
+  @FieldResolver(() => String)
+  textSnippet(
+    @Root() root: Post,
+    @Arg('clipLength', { defaultValue: 180 }) clipLength: number
+  ) {
+    return truncate(root.text, clipLength, true);
+  }
+
   // get all posts
   @Query(() => [Post])
   posts(
