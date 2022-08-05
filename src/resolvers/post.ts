@@ -18,6 +18,7 @@ import { isAuth } from '../middleware/isAuth';
 import { getConnection } from 'typeorm';
 import { POST_LIMIT_CAP } from '../constants';
 import { truncate } from '../utils/truncate';
+import { Upvote } from '../entities/Upvote';
 
 @InputType()
 class PostInput {
@@ -45,6 +46,40 @@ export class PostResolver {
     @Arg('clipLength', { defaultValue: 180 }) clipLength: number
   ) {
     return truncate(root.text, clipLength, true);
+  }
+
+  @Mutation(() => Boolean)
+  @UseMiddleware(isAuth)
+  async vote(
+    @Arg('postId', () => Int) postId: number,
+    @Arg('value', () => Int) value: number,
+    @Ctx() { req }: MyContext
+  ) {
+    const { userId } = req.session;
+    const checkedValue = value < 0 ? -1 : 1; // point is always +-1
+
+    // await Upvote.insert({
+    //   userId,
+    //   postId,
+    //   value: checkedValue
+    // });
+
+    await getConnection().query(
+      `
+      START TRANSACTION;
+
+        INSERT INTO upvote ("userId", "postId", value)
+        VALUES (${userId}, ${postId}, ${checkedValue});
+
+        UPDATE post
+        SET points = points + ${checkedValue}
+        WHERE id = ${postId};
+
+      COMMIT;
+    `
+    );
+
+    return true;
   }
 
   // get all posts
