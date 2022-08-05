@@ -69,7 +69,7 @@ export class PostResolver {
         SET value = $1
         WHERE "postId" = $2 AND "userId" = $3;
         `,
-          [postId, userId, checkedValue]
+          [checkedValue, postId, userId]
         );
 
         await tm.query(
@@ -112,32 +112,46 @@ export class PostResolver {
   @Query(() => PaginatedPosts)
   async posts(
     @Arg('limit', () => Int) limit: number,
-    @Arg('cursor', () => String, { nullable: true }) cursor: string | null
+    @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
+    @Ctx() { req }: MyContext
   ): Promise<PaginatedPosts> {
     const realLimit = Math.min(limit, POST_LIMIT_CAP);
     const realLimitPlusOne = realLimit + 1;
 
+    const { userId } = req.session;
+
     const sqlParameters: any[] = [realLimitPlusOne];
-    if (cursor) sqlParameters.push(new Date(parseInt(cursor)));
+    if (userId) sqlParameters.push(userId);
+
+    let cursorParamIndex = 3;
+    if (cursor) {
+      sqlParameters.push(new Date(parseInt(cursor)));
+      cursorParamIndex = sqlParameters.length;
+    }
 
     const posts = await getConnection().query(
       `
-      SELECT 
-        p.*,
-        json_build_object(
-          'username', u.username,
-          'id', u.id,
-          'email', u.email,
-          'createdAt', u."createdAt",
-          'updatedAt', u."updatedAt"
-          ) creator 
-      FROM post p
-      
-      INNER JOIN public.user u ON u.id = p."creatorId"
-      ${cursor ? 'WHERE p."createdAt" < $2' : ''}
-      ORDER BY p."createdAt" DESC
-      LIMIT $1
-    `,
+        SELECT
+          p.*,
+          json_build_object(
+            'username', u.username,
+            'id', u.id,
+            'email', u.email,
+            'createdAt', u."createdAt",
+            'updatedAt', u."updatedAt"
+            ) creator,
+        ${
+          userId
+            ? '(SELECT value FROM upvote WHERE "userId" = $2 and "postId" = p.id) "voteStatus"'
+            : 'NULL as "voteStatus"'
+        }
+        FROM post p
+
+        INNER JOIN public.user u ON u.id = p."creatorId"
+        ${cursor ? `WHERE p."createdAt" < $${cursorParamIndex}` : ''}
+        ORDER BY p."createdAt" DESC
+        LIMIT $1
+      `,
       sqlParameters
     );
 
