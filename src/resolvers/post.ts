@@ -58,26 +58,52 @@ export class PostResolver {
     const { userId } = req.session;
     const checkedValue = value < 0 ? -1 : 1; // point is always +-1
 
-    // await Upvote.insert({
-    //   userId,
-    //   postId,
-    //   value: checkedValue
-    // });
+    const upvote = await Upvote.findOne({ where: { postId, userId } });
 
-    await getConnection().query(
-      `
-      START TRANSACTION;
+    // if the user has voted before and they are changing their vote
+    if (upvote && upvote.value !== checkedValue) {
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `
+        UPDATE upvote
+        SET value = $1
+        WHERE "postId" = $2 AND "userId" = $3;
+        `,
+          [postId, userId, checkedValue]
+        );
 
-        INSERT INTO upvote ("userId", "postId", value)
-        VALUES (${userId}, ${postId}, ${checkedValue});
-
+        await tm.query(
+          `
         UPDATE post
-        SET points = points + ${checkedValue}
-        WHERE id = ${postId};
+        SET points = points + $1
+        WHERE id = $2;
+        `,
+          [2 * checkedValue, postId]
+        );
+      });
+    }
 
-      COMMIT;
-    `
-    );
+    // has never voted before
+    else if (!upvote) {
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `
+        INSERT INTO upvote ("userId", "postId", value)
+        VALUES ($1, $2, $3);
+        `,
+          [userId, postId, checkedValue]
+        );
+
+        await tm.query(
+          `
+        UPDATE post
+        SET points = points + $1
+        WHERE id = $2;
+        `,
+          [checkedValue, postId]
+        );
+      });
+    }
 
     return true;
   }
