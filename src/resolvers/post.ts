@@ -19,6 +19,7 @@ import { getConnection } from 'typeorm';
 import { POST_LIMIT_CAP } from '../constants';
 import { truncate } from '../utils/truncate';
 import { Upvote } from '../entities/Upvote';
+import { User } from '../entities/User';
 
 @InputType()
 class PostInput {
@@ -46,6 +47,11 @@ export class PostResolver {
     @Arg('clipLength', { defaultValue: 180 }) clipLength: number
   ) {
     return truncate(root.text, clipLength, true);
+  }
+
+  @FieldResolver(() => User)
+  creator(@Root() post: Post, @Ctx() { userLoader }: MyContext) {
+    return userLoader.load(post.creatorId);
   }
 
   @Mutation(() => Boolean)
@@ -133,13 +139,6 @@ export class PostResolver {
       `
         SELECT
           p.*,
-          json_build_object(
-            'username', u.username,
-            'id', u.id,
-            'email', u.email,
-            'createdAt', u."createdAt",
-            'updatedAt', u."updatedAt"
-            ) creator,
         ${
           userId
             ? '(SELECT value FROM upvote WHERE "userId" = $2 and "postId" = p.id) "voteStatus"'
@@ -147,7 +146,6 @@ export class PostResolver {
         }
         FROM post p
 
-        INNER JOIN public.user u ON u.id = p."creatorId"
         ${cursor ? `WHERE p."createdAt" < $${cursorParamIndex}` : ''}
         ORDER BY p."createdAt" DESC
         LIMIT $1
@@ -163,7 +161,7 @@ export class PostResolver {
 
   @Query(() => Post, { nullable: true })
   post(@Arg('id', () => Int) id: number): Promise<Post | null> {
-    return Post.findOne({ where: { id }, relations: ['creator'] });
+    return Post.findOne({ where: { id } });
   }
 
   // create post
