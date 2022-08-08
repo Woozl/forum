@@ -20,6 +20,7 @@ import { Post } from './entities/Post';
 import path from 'path';
 import { Upvote } from './entities/Upvote';
 import { createUserLoader } from './utils/createUserLoader';
+import { createUpvoteLoader } from './utils/createUpvoteLoader';
 
 const main = async () => {
   const conn = createConnection({
@@ -74,7 +75,8 @@ const main = async () => {
       req,
       res,
       redis,
-      userLoader: createUserLoader()
+      userLoader: createUserLoader(),
+      upvoteLoader: createUpvoteLoader()
     }),
     plugins: [
       // Install a landing page plugin based on NODE_ENV

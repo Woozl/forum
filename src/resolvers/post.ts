@@ -54,6 +54,21 @@ export class PostResolver {
     return userLoader.load(post.creatorId);
   }
 
+  @FieldResolver(() => Int, { nullable: true })
+  async voteStatus(
+    @Root() post: Post,
+    @Ctx() { upvoteLoader, req }: MyContext
+  ) {
+    if (!req.session.userId) return null;
+
+    const upvote = await upvoteLoader.load({
+      postId: post.id,
+      userId: req.session.userId
+    });
+
+    return upvote ? upvote.value : null;
+  }
+
   @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
   async vote(
@@ -124,29 +139,16 @@ export class PostResolver {
     const realLimit = Math.min(limit, POST_LIMIT_CAP);
     const realLimitPlusOne = realLimit + 1;
 
-    const { userId } = req.session;
-
     const sqlParameters: any[] = [realLimitPlusOne];
-    if (userId) sqlParameters.push(userId);
-
-    let cursorParamIndex = 3;
-    if (cursor) {
-      sqlParameters.push(new Date(parseInt(cursor)));
-      cursorParamIndex = sqlParameters.length;
-    }
+    if (cursor) sqlParameters.push(new Date(parseInt(cursor)));
 
     const posts = await getConnection().query(
       `
         SELECT
-          p.*,
-        ${
-          userId
-            ? '(SELECT value FROM upvote WHERE "userId" = $2 and "postId" = p.id) "voteStatus"'
-            : 'NULL as "voteStatus"'
-        }
+          p.*
         FROM post p
 
-        ${cursor ? `WHERE p."createdAt" < $${cursorParamIndex}` : ''}
+        ${cursor ? `WHERE p."createdAt" < $2` : ''}
         ORDER BY p."createdAt" DESC
         LIMIT $1
       `,
