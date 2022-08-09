@@ -1,3 +1,4 @@
+import 'dotenv-safe/config';
 import 'reflect-metadata';
 import { COOKIE_ID, __prod__ } from './constants';
 import express from 'express';
@@ -25,11 +26,9 @@ import { createUpvoteLoader } from './utils/createUpvoteLoader';
 const main = async () => {
   const conn = createConnection({
     type: 'postgres',
-    database: 'forum2',
-    username: 'postgres',
-    password: 'postgres',
+    url: process.env.DATABASE_URL,
     logging: true,
-    synchronize: true,
+    // synchronize: true,
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [Post, User, Upvote]
   });
@@ -39,7 +38,7 @@ const main = async () => {
   const app = express();
 
   const RedisStore = connectRedis(session);
-  let redis = new Redis();
+  let redis = new Redis(process.env.REDIS_URL);
 
   // https://github.com/apollographql/apollo-server/issues/5775#issuecomment-936896592
   // Workaround to set cookie over insecure connection
@@ -50,7 +49,7 @@ const main = async () => {
     session({
       store: new RedisStore({ client: redis, disableTouch: true }),
       name: COOKIE_ID,
-      secret: 'be3708ed-a7d3-41d5-b7be-5b5afbff99da',
+      secret: process.env.SESSION_SECRET,
       saveUninitialized: false,
       resave: false,
       cookie: {
@@ -96,12 +95,12 @@ const main = async () => {
   apolloServer.applyMiddleware({
     app,
     cors: {
-      origin: ['https://studio.apollographql.com', 'http://localhost:3000'],
+      origin: ['https://studio.apollographql.com', process.env.CORS_ORIGIN],
       credentials: true
     }
   });
 
-  app.listen(4000, () => {
+  app.listen(parseInt(process.env.PORT), () => {
     console.log('[Server] Started listening on localhost:4000');
   });
 };
